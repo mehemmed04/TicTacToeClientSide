@@ -1,5 +1,8 @@
-﻿using System;
+﻿using AForge.Video;
+using AForge.Video.DirectShow;
+using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -15,7 +18,10 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
-
+using System.Runtime.InteropServices;
+using System.Windows.Interop;
+using System.Diagnostics.Tracing;
+using Image = System.Drawing.Image;
 
 namespace TicTacToeClientSide
 {
@@ -24,20 +30,76 @@ namespace TicTacToeClientSide
     /// </summary>
     public partial class MainWindow : Window
     {
+        FilterInfoCollection filterInfoCollection;
+        VideoCaptureDevice videoCaptureDevice;
         public char CurrentPlayer { get; set; }
-        private static readonly Socket ClientSocket = new Socket(AddressFamily.InterNetwork,
-            SocketType.Stream, ProtocolType.Tcp);
+        private static readonly Socket ClientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         private const int port = 27001;
         public MainWindow()
         {
             InitializeComponent();
+            filterInfoCollection = new FilterInfoCollection(FilterCategory.VideoInputDevice);
+            videoCaptureDevice = new VideoCaptureDevice(filterInfoCollection[0].MonikerString);
+            videoCaptureDevice.NewFrame += VideoCaptureDevice_NewFrame;
+            videoCaptureDevice.Start();
+
         }
+
+        public static string GetImagePath(byte[] buffer)
+        {
+            ImageConverter ic = new ImageConverter();
+            Image img = (Image)ic.ConvertFrom(buffer);
+            Bitmap bitmap1 = new Bitmap(img);
+            var num = Guid.NewGuid();
+            bitmap1.Save($@"image{num}.png");
+            var imagepath = $@"image{num}.png";
+            return imagepath;
+        }
+        public static byte[] GetBytesOfImage(string path)
+        {
+            var image = new Bitmap(path);
+            ImageConverter imageconverter = new ImageConverter();
+            var imagebytes = ((byte[])imageconverter.ConvertTo(image, typeof(byte[])));
+            return imagebytes;
+        }
+
+
+        public byte[] ImageToByte(System.Drawing.Image img)
+        {
+            ImageConverter converter = new ImageConverter();
+            return (byte[])converter.ConvertTo(img, typeof(byte[]));
+        }
+        private void VideoCaptureDevice_NewFrame(object sender, NewFrameEventArgs eventArgs)
+        {
+            App.Current.Dispatcher.Invoke(() =>
+            {
+                var _source = (Bitmap)eventArgs.Frame.Clone();
+                imgCapture.Source = ImageSourceFromBitmap(_source);
+                ImageBytes = ImageToByte(_source);
+            });
+        }
+        [DllImport("gdi32.dll", EntryPoint = "DeleteObject")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool DeleteObject([In] IntPtr hObject);
+
+        public ImageSource ImageSourceFromBitmap(Bitmap bmp)
+        {
+            var handle = bmp.GetHbitmap();
+            try
+            {
+                return Imaging.CreateBitmapSourceFromHBitmap(handle, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+            }
+            finally { DeleteObject(handle); }
+        }
+
+
         public bool IsMyTurn { get; set; } = false;
         private void Button_Click(object sender, RoutedEventArgs e)
         {
             ConnectToServer();
             RequestLoop();
         }
+        public byte[] ImageBytes { get; set; }
         public string MySymbol { get; set; }
         private void RequestLoop()
         {
@@ -127,34 +189,6 @@ namespace TicTacToeClientSide
                 //EnabledAllButtons(true);
             });
         }
-
-        private async void TakePhoto(object sender, RoutedEventArgs e)
-        {
-            if (!_initialized)
-            {
-                return;
-            }
-
-            using var stream = new InMemoryRandomAccessStream();
-
-            await _mediaCapture.CapturePhotoToStreamAsync(ImageEncodingProperties.CreateJpeg(), stream);
-
-            try
-            {
-                var file = await _captureFolder.CreateFileAsync("Photo.jpg", CreationCollisionOption.GenerateUniqueName);
-
-                var decoder = await BitmapDecoder.CreateAsync(stream);
-
-                using var outputStream = await file.OpenAsync(FileAccessMode.ReadWrite);
-                var encoder = await BitmapEncoder.CreateForTranscodingAsync(outputStream, decoder);
-
-                await encoder.FlushAsync();
-            }
-            catch (Exception)
-            {
-            }
-        }
-
         private void ConnectToServer()
         {
             int attempts = 0;
@@ -168,6 +202,8 @@ namespace TicTacToeClientSide
                     if (name != String.Empty && name != null)
                     {
                         SendString($"Connected:{name}");
+                        ClientSocket.Send(ImageBytes, 0, ImageBytes.Length, SocketFlags.None);
+
                     }
                 }
                 catch (Exception)
@@ -176,7 +212,7 @@ namespace TicTacToeClientSide
             }
 
             MessageBox.Show("Connected");
-
+            videoCaptureDevice.Stop();
             var buffer = new byte[2048];
             int received = ClientSocket.Receive(buffer, SocketFlags.None);
             if (received == 0) return;

@@ -5,9 +5,15 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:TicTacToeClientSide"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="MainWindow" Height="650" Width="800">
     <Grid>
         <StackPanel>
+            <Image
+                Name="imgCapture"
+                Width="150"
+                Height="150">
+                
+            </Image>
             <TextBox FontSize="30" Name="player" ></TextBox>
             <Button Name="Connect" Click="Button_Click" FontSize="30" >Connect To Server</Button>
             <WrapPanel Name="myWrap" Width="350" HorizontalAlignment="Center" Orientation="Horizontal" >
