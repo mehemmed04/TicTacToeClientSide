@@ -23,6 +23,7 @@ namespace TicTacToeClientSide
     /// </summary>
     public partial class MainWindow : Window
     {
+        public char CurrentPlayer { get; set; }
         private static readonly Socket ClientSocket = new Socket(AddressFamily.InterNetwork,
             SocketType.Stream, ProtocolType.Tcp);
         private const int port = 27001;
@@ -55,7 +56,7 @@ namespace TicTacToeClientSide
             int received = ClientSocket.Receive(buffer, SocketFlags.None);
             if (received == 0) return;
             var data = new byte[received];
-            IsMyTurn = true;
+            //IsMyTurn = true;
             Array.Copy(buffer, data, received);
             string text = Encoding.ASCII.GetString(data);
             IntegrateToView(text);
@@ -80,6 +81,48 @@ namespace TicTacToeClientSide
                 b7.Content = row3[0];
                 b8.Content = row3[1];
                 b9.Content = row3[2];
+
+                int x_count = 0;
+                int o_count = 0;
+
+                for (int i = 0; i < row1.Length; i++)
+                {
+                    if (row1[i] == "X") x_count++;
+                    else if (row1[i] == "O") o_count++;
+                }
+                for (int i = 0; i < row2.Length; i++)
+                {
+                    if (row2[i] == "X") x_count++;
+                    else if (row2[i] == "O") o_count++;
+                }
+                for (int i = 0; i < row3.Length; i++)
+                {
+                    if (row3[i] == "X") x_count++;
+                    else if (row3[i] == "O") o_count++;
+                }
+                if(x_count % 2 == 1 && o_count%2==0 || x_count%2==0 && o_count % 2 == 1)
+                {
+                    if (CurrentPlayer == 'X')
+                    {
+                        IsMyTurn = false;
+                    }
+                    else
+                    {
+                        IsMyTurn=true;
+                    }
+                }
+                else
+                {
+                    if (CurrentPlayer == 'X')
+                    {
+                        IsMyTurn = true;
+                    }
+                    else
+                    {
+                        IsMyTurn = false;
+                    }
+                }
+                
                 //EnabledAllButtons(true);
             });
         }
@@ -92,7 +135,7 @@ namespace TicTacToeClientSide
                 try
                 {
                     ++attempts;
-                    ClientSocket.Connect(IPAddress.Parse("10.2.13.79"), port);
+                    ClientSocket.Connect(IPAddress.Parse("10.2.27.29"), port);
                 }
                 catch (Exception)
                 {
@@ -109,6 +152,7 @@ namespace TicTacToeClientSide
 
             string text = Encoding.ASCII.GetString(data);
             MySymbol = text;
+            CurrentPlayer = text[0];
             this.Title = "Player : " + text;
             this.player.Text = this.Title;
             if (MySymbol == "X")
@@ -126,7 +170,6 @@ namespace TicTacToeClientSide
                     var bt = sender as Button;
                     string request = bt.Content.ToString() + player.Text.Split(' ')[2];
                     SendString(request);
-                    IsMyTurn = false;
                 });
             });
         }
