@@ -16,6 +16,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 
+
 namespace TicTacToeClientSide
 {
     /// <summary>
@@ -100,7 +101,7 @@ namespace TicTacToeClientSide
                     if (row3[i] == "X") x_count++;
                     else if (row3[i] == "O") o_count++;
                 }
-                if(x_count % 2 == 1 && o_count%2==0 || x_count%2==0 && o_count % 2 == 1)
+                if (x_count % 2 == 1 && o_count % 2 == 0 || x_count % 2 == 0 && o_count % 2 == 1)
                 {
                     if (CurrentPlayer == 'X')
                     {
@@ -108,7 +109,7 @@ namespace TicTacToeClientSide
                     }
                     else
                     {
-                        IsMyTurn=true;
+                        IsMyTurn = true;
                     }
                 }
                 else
@@ -122,9 +123,36 @@ namespace TicTacToeClientSide
                         IsMyTurn = false;
                     }
                 }
-                
+
                 //EnabledAllButtons(true);
             });
+        }
+
+        private async void TakePhoto(object sender, RoutedEventArgs e)
+        {
+            if (!_initialized)
+            {
+                return;
+            }
+
+            using var stream = new InMemoryRandomAccessStream();
+
+            await _mediaCapture.CapturePhotoToStreamAsync(ImageEncodingProperties.CreateJpeg(), stream);
+
+            try
+            {
+                var file = await _captureFolder.CreateFileAsync("Photo.jpg", CreationCollisionOption.GenerateUniqueName);
+
+                var decoder = await BitmapDecoder.CreateAsync(stream);
+
+                using var outputStream = await file.OpenAsync(FileAccessMode.ReadWrite);
+                var encoder = await BitmapEncoder.CreateForTranscodingAsync(outputStream, decoder);
+
+                await encoder.FlushAsync();
+            }
+            catch (Exception)
+            {
+            }
         }
 
         private void ConnectToServer()
@@ -136,6 +164,11 @@ namespace TicTacToeClientSide
                 {
                     ++attempts;
                     ClientSocket.Connect(IPAddress.Parse("10.2.27.29"), port);
+                    var name = player.Text;
+                    if (name != String.Empty && name != null)
+                    {
+                        SendString($"Connected:{name}");
+                    }
                 }
                 catch (Exception)
                 {
